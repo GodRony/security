@@ -1,23 +1,29 @@
 class DnsVhost:
     def __init__(self):
         print("DnsVhost init start")
-        self.VHOST_CONF = ""
-        self.SERVER_NAME = ""
-        self.Third_domain = []
+        self.VHOST_CONF = "vhost.conf"
+        self.SERVER_NAME = "heeyoung.com"
+        self.Third_domain = ["ns","jl","wp"]
+        self.ZONE_FILE = ""
+        self.IPADDR = ""
+
 
     def getter_VHOST_CONF(self) :
         return self.VHOST_CONF
 
-    def getter_SERVER_NAME(slef) :
+    def getter_SERVER_NAME(self) :
         return self.SERVER_NAME
     
     def getter_Third_domain(self) :
         return self.Third_domain
 
+    def getter_ZONE_FILE(self) :
+        return self.ZONE_FILE
+
     def test(self):
         return "touch test.text"
 
-    
+############## http ###############    
     def install_http_R(self):
         ## Rocky
         cmd = "dnf -y install httpd ; systemctl enable --now httpd ; dnf install expect -y"
@@ -70,4 +76,84 @@ EOF
     def restart_http_R(self):
         print("httpd restart 시작")
         return "systemctl restart httpd"
+############### dns ##################
+    def install_named_R(self):
+        print("dns를 위한 named를 설치하겠습니다")
+        return "dnf -y install bind bind-utils"
 
+    def set_named_conf_R(self):
+        print("named.conf 파일을 수정합니다~")
+        cmd = r"""
+NAMED_CONF="/etc/named.conf"
+sed -i 's/listen-on[[:space:]]*port 53[[:space:]]*{[[:space:]]*127\.0\.0\.1;[[:space:]]*};/listen-on port 53 { any; };/' "$NAMED_CONF"
+sed -i 's/allow-query[[:space:]]*{[[:space:]]*localhost;[[:space:]]*};/allow-query { any; };/' "$NAMED_CONF"
+    """
+        return cmd
+
+    def set_named_rfc_R(self):
+        my_server_name = self.getter_SERVER_NAME()
+        print(f"현재 당신이 사용하는 server name은 {my_server_name}입니다.")
+        print(f"ZONE FILE 생성 : {my_server_name}.zone ")
+        print(f"ZONE NAME : {my_server_name}")
+        
+        self.ZONE_FILE = f"{my_server_name}.zone"
+        ZONE_NAME = my_server_name
+
+        cmd = f'''
+cat >> /etc/named.rfc1912.zones <<EOF
+zone "{ZONE_NAME}" IN {{
+    type master;
+    file "{self.ZONE_FILE}";
+    allow-update {{ none; }};
+}};
+EOF
+'''
+        print("zone이  /etc/named.rfc1912.zones에 추가되었습니다.")
+        return cmd
+
+    def mk_zone_file_R(self):
+        print(f"zone 파일이 생성되었습니다: /var/named/{self.ZONE_FILE}")
+        return  f"touch /var/named/{self.ZONE_FILE}"
+
+    def set_zone_file_R(self) :
+         
+        print("zone file의 내용을 수정하겠습니다.")
+        domain = f"ns.{self.SERVER_NAME}"
+        self.IPADDR = input("현재 사용하고 있는 DNS의 ip (ip a 확인) (ex. 172.16.16.100): ")
+        contents = f"""$TTL    604800
+@       IN      SOA     {domain}. root.adminemail.com. (
+                              2         ; Serial
+                         604800         ; Refresh
+                          86400         ; Retry 
+                        2419200         ; Expire
+                         604800 )       ; Negative Cache TTL
+;
+@       IN      NS      {domain}.
+ns       IN      A       {self.IPADDR}
+@       IN      AAAA    ::1
+
+"""
+        
+        print("zone file 내용 수정 완료")
+        return f"/var/named/{self.ZONE_FILE}", contents # w_ssh로 실행할것
+    
+
+    def set_dns_Third_domain(self):
+        third_domains = self.getter_Third_domain()
+        contents = ""
+        for third in third_domains:
+            contents += f"{third}        IN        A        {self.IPADDR}\n"
+        
+        return f"/var/named/{self.ZONE_FILE}", contents
+
+    def start_dns_R(self):
+        return "systemctl restart named"
+
+
+
+
+
+
+
+
+    

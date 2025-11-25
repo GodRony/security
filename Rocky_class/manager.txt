@@ -1,0 +1,6 @@
+## DnsVhost 파일 관리자 ##
+self.VHOST_CONF = ""
+self.SERVER_NAME = ""
+self.Third_domain = []
+self.ZONE_FILE = ""
+self.IPADDR = ""
